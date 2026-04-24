@@ -299,8 +299,19 @@ body.endgame-active .capital-suggest .msg.go { color:#ff0000; text-shadow: 0 0 1
         <div class="stats-row"><span>Tín Hiệu Cuối:</span><span id="stat-updated">--</span></div>
     </div>
 
+    <!-- ENDGAME SIMULATION -->
+    <div class="box-module">
+        <h3><i class="fas fa-biohazard"></i> SỔ XUYÊN THỦNG TẤT TAY</h3>
+        <div class="stats-row"><span>Log Lệnh Tất Tay:</span><span id="stat-eg-count" style="color:#ffaa00">-- Lệnh</span></div>
+        <div class="stats-row"><span>Tỉ Lệ Thắng Lệnh Bão:</span><span id="stat-eg-acc" style="color:#0f0">--</span></div>
+        <div style="background:rgba(255,0,0,0.1);border:1px dashed #ff0000;padding:10px;border-radius:10px;margin-top:10px;text-align:center">
+            <div style="font-size:11px;color:#aaa;margin-bottom:5px">MÔ PHỎNG LỜI LÃI (Dựa trên vốn hiện tại gốc)</div>
+            <div id="stat-eg-profit" style="font-size:20px;font-weight:900;color:#0f0;font-family:'Orbitron', sans-serif">-- VNĐ</div>
+        </div>
+    </div>
+
     <!-- HISTORY -->
-    <div class="box-module history-box">
+    <div class="box-module history-box" style="grid-column: 1 / -1; max-width: 100%;">
         <h3><i class="fas fa-history"></i> LỊCH SỬ AI CHỐT</h3>
         <div id="history-list"></div>
     </div>
@@ -501,6 +512,41 @@ async function fetchData() {
 
             updateCapitalUI(pred.confidence, isEndgame, hist.history);
         }
+
+        // TÍNH TOÁN LÃI SUẤT ẢO KHI CÓ LỆNH TẤT TAY TỪ DATA SERVER
+        // Lấy danh sách lệnh Tất Tay từ khi boot (đảo ngược để tính từ cũ tới mới)
+        const endgamesLog = hist.history.filter(h => h.adaptive && h.adaptive.recommendation && h.adaptive.recommendation.includes('TẤT TAY'));
+        const completedEndgames = endgamesLog.filter(x => x.correct !== null);
+        const calcEndgames = [...completedEndgames].reverse();
+
+        let baseCapital = parseInt(document.getElementById('input-capital')?.value) || 200000;
+        let simBalance = baseCapital;
+        let egWins = 0, egLoss = 0;
+        let wasLastFailed = false;
+
+        calcEndgames.forEach(eg => {
+            let percent = wasLastFailed ? 50 : 20;
+            const betAmount = Math.floor((simBalance * percent) / 100);
+            
+            if (eg.correct) {
+                // Thuật toán trừ phế nhà cái 2%
+                simBalance += Math.floor(betAmount * 0.98);
+                egWins++;
+                wasLastFailed = false;
+            } else {
+                simBalance -= betAmount;
+                egLoss++;
+                wasLastFailed = true;
+            }
+        });
+
+        const profit = simBalance - baseCapital;
+        const totalEg = egWins + egLoss;
+
+        document.getElementById('stat-eg-count').innerHTML = `${egWins} Thắng / ${egLoss} Thua`;
+        document.getElementById('stat-eg-acc').innerHTML = totalEg > 0 ? `${((egWins/totalEg)*100).toFixed(1)}%` : '--';
+        document.getElementById('stat-eg-profit').innerHTML = profit >= 0 ? `+${CAPITAL.formatMoney(profit)} đ` : `${CAPITAL.formatMoney(profit)} đ`;
+        document.getElementById('stat-eg-profit').style.color = profit >= 0 ? '#0f0' : '#f00';
 
         document.getElementById('stat-accuracy').innerText = hist.accuracy || '--';
         document.getElementById('stat-correct').innerText = hist.total > 0 ? `${hist.correct} / ${hist.total}` : '--';
