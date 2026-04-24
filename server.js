@@ -140,13 +140,28 @@ async function updateGame(gid) {
         newTotals.push(sum);
         newDice.push({ d1, d2, d3, sid: x.id || x.sid || 0, ts: Date.now() - i * 30000 });
     }
-    S.history = newHistory;
-    S.totals = newTotals;
-    S.diceData = newDice;
-    S.lastTotal = newTotals[0] || 0;
-    S.recentHistory = newHistory.slice(0, 10).map(x => x === 1 ? 'T' : 'X').join('');
-
+    // MERGE THÔNG MINH ĐỂ NUÔI DATA LÊN 10,000 VÁN (Thay vì reset về 100)
     const latestPhien = list[0].id || list[0].sid || 0;
+    const gap = latestPhien - (S.lastPhien || latestPhien);
+    
+    if (!S.history || S.history.length === 0 || gap >= cap) {
+        S.history = newHistory;
+        S.totals = newTotals;
+        S.diceData = newDice;
+    } else if (gap > 0) {
+        // Chèn gap phần tử mới nhất vào đầu mảng cũ
+        S.history.unshift(...newHistory.slice(0, gap));
+        S.totals.unshift(...newTotals.slice(0, gap));
+        S.diceData.unshift(...newDice.slice(0, gap));
+        
+        // Cắt mảng về đúng sức chứa vĩ đại
+        if (S.history.length > MAX_PRED_LOG) S.history.length = MAX_PRED_LOG;
+        if (S.totals.length > MAX_PRED_LOG) S.totals.length = MAX_PRED_LOG;
+        if (S.diceData.length > MAX_PRED_LOG) S.diceData.length = MAX_PRED_LOG;
+    }
+
+    S.lastTotal = S.totals[0] || 0;
+    S.recentHistory = newHistory.slice(0, 10).map(x => x === 1 ? 'T' : 'X').join('');
 
     if (latestPhien > S.lastPhien) {
         const actual = (newHistory[0] === 1) ? 'TAI' : 'XIU';
