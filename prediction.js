@@ -1019,10 +1019,10 @@ function predictEndgameHolyGrail(history, historyTotals) {
     const h = history; // h is already binary array 1/0
     const ts = historyTotals; // array of totals
 
-    // 1. MARKOV TỔ TUYỆT ĐỐI
+    // 1. MARKOV TỔ TUYỆT ĐỐI (MEMORY DEEP SCAN LÊN ĐẾN 10,000 VÁN)
     const currentPattern = h.slice(0, 5).join('');
     let matchT = 0, matchX = 0;
-    for (let i = 5; i < Math.min(h.length - 5, 2000); i++) {
+    for (let i = 5; i < Math.min(h.length - 5, 10000); i++) {
         if (h.slice(i, i + 5).join('') === currentPattern) {
             if (h[i - 1] === 1) matchT++;
             else matchX++;
