@@ -15,8 +15,24 @@ for (let i = 1; i <= 26; i++) {
 const HIGH_CONFIDENCE_THRESHOLD = 0.75;
 const MODERATE_CONFIDENCE_THRESHOLD = 0.60;
 
+// V10.8: SHADOW-STATE TRACKER (Chống chuỗi thua dựa trên dulieu.txt)
+const SHADOW_TRACKER = {
+    globalLossStreak: 0,
+    logicStreaks: {},
+    isShadowMode: false
+};
+
 function updateLogicPerformance(logicName, predicted, actual) {
     if (predicted === null || !logicPerformance[logicName]) return;
+    
+    // Shadow tracking
+    if (!SHADOW_TRACKER.logicStreaks[logicName]) SHADOW_TRACKER.logicStreaks[logicName] = 0;
+    if (predicted !== actual) {
+        SHADOW_TRACKER.logicStreaks[logicName]++;
+    } else {
+        SHADOW_TRACKER.logicStreaks[logicName] = 0;
+    }
+
     const currentAcc = logicPerformance[logicName].accuracy;
     const currentTotal = logicPerformance[logicName].total;
     let dynamicDecayFactor = 0.95;
@@ -39,6 +55,18 @@ function updateLogicPerformance(logicName, predicted, actual) {
         logicPerformance[logicName].accuracy = 0.95;
     logicPerformance[logicName].lastPredicted = predicted;
     logicPerformance[logicName].lastActual = actual;
+}
+
+function trackAdaptiveResult(gameId, logicName, predicted, actual) {
+    if (predicted === actual) {
+        SHADOW_TRACKER.globalLossStreak = 0;
+        SHADOW_TRACKER.isShadowMode = false;
+    } else {
+        SHADOW_TRACKER.globalLossStreak++;
+        if (SHADOW_TRACKER.globalLossStreak >= 3) {
+            SHADOW_TRACKER.isShadowMode = true;
+        }
+    }
 }
 
 // ==================== HELPERS ====================
@@ -628,27 +656,28 @@ function predictLogic24(history) {
 }
 
 function logic25(history) {
-    const last5 = history.slice(-5);
+    if (history.length < 5) return null;
+    const last5 = history.slice(0, 5).map(s => s.result);
     let count = 1;
-    for (let i = last5.length - 1; i > 0; i--) {
-        if (last5[i] === last5[i - 1]) count++;
+    for (let i = 0; i < last5.length - 1; i++) {
+        if (last5[i] === last5[i + 1]) count++;
         else break;
     }
-    if (count >= 3) return last5[last5.length - 1];
+    if (count >= 3) return last5[0];
     return null;
 }
 
 function logic26(history) {
-    const last5 = history.slice(-5);
-    const taiCount = last5.filter(r => r === 'Tài').length;
-    const xiuCount = last5.filter(r => r === 'Xỉu').length;
-    if (taiCount >= 7) return 'X';
-    if (xiuCount >= 7) return 'T';
+    if (history.length < 10) return null;
+    const last10 = history.slice(0, 10).map(s => s.result);
+    const taiCount = last10.filter(r => r === 'Tài').length;
+    const xiuCount = last10.filter(r => r === 'Xỉu').length;
+    if (taiCount >= 7) return 'Xỉu';
+    if (xiuCount >= 7) return 'Tài';
     return null;
 }
 
-// ==================== ENSEMBLE VOTE (KHỚP 100% userscript gốc) ====================
-// Gốc chỉ gọi 9 logic: L1, L3, L4, L7, L9, L11, L21, L25, L26 — mỗi vote = 1 (không trọng số)
+// ==================== ENSEMBLE VOTE ====================
 function ensembleVote(history, lastSession, nextSessionId) {
     const votes = { tai: 0, xiu: 0, details: {} };
     const tally = (name, r) => {
@@ -662,16 +691,8 @@ function ensembleVote(history, lastSession, nextSessionId) {
     try { tally('logic9', predictLogic9(history)); } catch (e) {}
     try { tally('logic11', predictLogic11(history)); } catch (e) {}
     try { tally('logic21', predictLogic21(history)); } catch (e) {}
-    try {
-        const p25 = logic25(history);
-        if (p25 === 'T') votes.tai++;
-        else if (p25 === 'X') votes.xiu++;
-    } catch (e) {}
-    try {
-        const p26 = logic26(history);
-        if (p26 === 'T') votes.tai++;
-        else if (p26 === 'X') votes.xiu++;
-    } catch (e) {}
+    try { tally('logic25', logic25(history)); } catch (e) {}
+    try { tally('logic26', logic26(history)); } catch (e) {}
     return votes;
 }
 
@@ -1033,14 +1054,15 @@ function predictEndgameHolyGrail(history, historyTotals) {
         if (matchX === 0) return { prediction: "TAI", logic: "[ENDGAME]: MARKOV 100% CẢNH GIỚI (KHÔNG CÓ XỈU)" };
     }
 
-    // 2. SHADOW-STATE META INVERSION
+    // 2. SHADOW-STATE META INVERSION (Khắc chế bệt từ dulieu.txt)
     let pingPongLength = 0;
     for (let i = 0; i < h.length - 1; i++) {
         if (h[i] !== h[i+1]) pingPongLength++;
         else break;
     }
-    if (pingPongLength >= 6 && pingPongLength < 9) {
-        return { prediction: h[0] === 1 ? "TAI" : "XIU", logic: `[ENDGAME]: BẺ PING-PONG CỰC HẠN NHỊP THỨ ${pingPongLength + 1}` };
+    if (pingPongLength >= 6 && pingPongLength < 10) {
+        // MD5 thường gãy ping pong ở nhịp 7-9
+        return { prediction: h[0] === 1 ? "TAI" : "XIU", logic: `[ENDGAME]: ĐÚ PING-PONG (NHỊP THỨ ${pingPongLength + 1})` };
     }
 
     let betLength = 1;
@@ -1048,8 +1070,14 @@ function predictEndgameHolyGrail(history, historyTotals) {
         if (h[i] === h[0]) betLength++;
         else break;
     }
-    if (betLength >= 7 && betLength < 10) {
-        return { prediction: h[0] === 1 ? "XIU" : "TAI", logic: `[ENDGAME]: BẺ BÃO BỆT CỰC ĐẠI NHỊP THỨ ${betLength + 1}` };
+    
+    // CHIẾN THUẬT BỆT MD5 (TỐI ƯU TỪ DULIEU.TXT)
+    if (betLength >= 9) {
+        return { prediction: h[0] === 1 ? "XIU" : "TAI", logic: `[ENDGAME]: BẺ BỆT TỬ THẦN (NHỊP THỨ ${betLength + 1} - ĐIỂM GÃY VÀNG)` };
+    } else if (betLength >= 7) {
+        return { prediction: null, logic: `[ENDGAME]: VÙNG NGUY HIỂM (BỆT NHỊP ${betLength}) - NÍN THỞ CHỜ ĐIỂM GÃY` };
+    } else if (betLength >= 4) {
+        return { prediction: h[0] === 1 ? "TAI" : "XIU", logic: `[ENDGAME]: ĐÚ BỆT CƠ HỘI (NHỊP THỨ ${betLength + 1})` };
     }
 
     // 3. THÁI CỰC TỔNG ĐIỂM NGƯỢC
@@ -1120,6 +1148,15 @@ function deepAnalysisAdaptive(gameId, S) {
     else if (stats.shouldFlip) recommendation = 'VÀO LỆNH (đã auto-đảo)';
     else if (stats.acc >= 0.50) recommendation = 'CÂN NHẮC - vốn nhỏ';
     else recommendation = 'NÊN BỎ QUA - không đủ tin cậy';
+
+    // 5. V10.8: SHADOW INVERSION GUARD (Khắc chế chuỗi thua từ dulieu.txt)
+    if (SHADOW_TRACKER.isShadowMode) {
+        const originalPred = finalPred;
+        finalPred = originalPred === 'TAI' ? 'XIU' : 'TAI';
+        logicMsg = `[SHADOW-INVERTED] ${logicMsg} (Phát hiện chuỗi thua ${SHADOW_TRACKER.globalLossStreak} ván - Đảo ngược lệnh)`;
+        recommendation = `PHỤC THÙ - ĐẢO LỆNH BÓNG MA ⚡`;
+        confidence = 88; // Tăng tự tin khi đi vào trạng thái đảo ngược
+    }
 
     return {
         ...raw,
