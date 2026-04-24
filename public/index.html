@@ -216,6 +216,16 @@ body.endgame-active .capital-suggest .msg.go { color:#ff0000; text-shadow: 0 0 1
 .history-item .pred.xiu { color:#f00; }
 .history-item .result-icon { font-size:15px; }
 .history-item .conf { color:#666; font-family: 'Orbitron', sans-serif; }
+
+/* LOCK OVERLAY CHO VỐN */
+.box-module.locked { opacity: 0.6; pointer-events: none; position: relative; }
+.box-module.locked::after {
+    content: "🔒 AI ĐANG GOM DATA - KHÓA BẢO TOÀN VỐN 🔒";
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(255,0,0,0.9); padding: 12px 20px; border-radius: 12px; color: #fff;
+    font-weight: 900; font-size: 13px; z-index: 100; white-space: nowrap;
+    box-shadow: 0 0 20px #f00; border: 2px solid #fff; font-family: 'Orbitron', sans-serif;
+}
 </style>
 </head>
 <body>
@@ -265,7 +275,7 @@ body.endgame-active .capital-suggest .msg.go { color:#ff0000; text-shadow: 0 0 1
 
 <div class="panel-grid">
     <!-- VỐN -->
-    <div class="box-module">
+    <div class="box-module" id="capital-panel">
         <h3><i class="fas fa-coins"></i> QUẢN LÝ VỐN TỰ ĐỘNG</h3>
         <div class="capital-input-group">
             <label>Vốn Hiện Tại (VNĐ):</label>
@@ -280,6 +290,7 @@ body.endgame-active .capital-suggest .msg.go { color:#ff0000; text-shadow: 0 0 1
             <select id="input-mode">
                 <option value="safe">Siêu An Toàn (Chỉ đánh lệnh 90%+)</option>
                 <option value="fast">Đốt Cháy Giai Đoạn (Nhanh Lãi)</option>
+                <option value="all">Thực Chiến Bạo Chúa (Phiên nào cũng đánh)</option>
             </select>
         </div>
         <div class="capital-suggest">
@@ -309,6 +320,8 @@ body.endgame-active .capital-suggest .msg.go { color:#ff0000; text-shadow: 0 0 1
             <div id="stat-eg-profit" style="font-size:20px;font-weight:900;color:#0f0;font-family:'Orbitron', sans-serif">-- VNĐ</div>
         </div>
     </div>
+
+
 
     <!-- HISTORY -->
     <div class="box-module history-box" style="grid-column: 1 / -1; max-width: 100%;">
@@ -370,7 +383,15 @@ const CAPITAL = {
             if (confidence >= 95) percent = 2;
             else if (confidence >= 85) percent = 1;
             else percent = 0;
-        } else {
+        } 
+        else if (CAPITAL.mode === 'all') {
+            // Bạo chúa: Không bỏ sót phiên nào
+            if (confidence >= 95) percent = 15;
+            else if (confidence >= 85) percent = 8;
+            else if (confidence >= 75) percent = 4;
+            else percent = 1; // Thấp nhất cũng rải 1% dò đường
+        }
+        else {
             // Chế độ MÌ TÔM / Đốt Cháy (Fast Mode)
             if (confidence >= 95) percent = 8;
             else if (confidence >= 85) percent = 4;
@@ -510,7 +531,13 @@ async function fetchData() {
                     <div style="color:#00ffff;font-weight:900;font-size:18px;letter-spacing:4px;font-family:'Orbitron'">${getExpectedNums(pred.lastTotal, isTai)}</div>
                 </div>`;
 
-            updateCapitalUI(pred.confidence, isEndgame, hist.history);
+            const isReady = (pred.historyCount >= 50);
+            if (!isReady) {
+                document.getElementById('capital-panel').classList.add('locked');
+            } else {
+                document.getElementById('capital-panel').classList.remove('locked');
+                updateCapitalUI(pred.confidence, isEndgame, hist.history);
+            }
         }
 
         // TÍNH TOÁN LÃI SUẤT ẢO KHI CÓ LỆNH TẤT TAY TỪ DATA SERVER
