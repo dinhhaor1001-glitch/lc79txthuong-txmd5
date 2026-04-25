@@ -1071,13 +1071,19 @@ function predictEndgameHolyGrail(history, historyTotals) {
         else break;
     }
     
-    // CHIẾN THUẬT BỆT MD5 (TỐI ƯU TỪ DULIEU.TXT)
+    // CHIẾN THUẬT BỆT MD5 (TỐI ƯU KHẨN CẤP TỪ DULIEU.TXT - CHỐNG BẪY NHÀ CÁI)
     if (betLength >= 9) {
-        return { prediction: h[0] === 1 ? "XIU" : "TAI", logic: `[ENDGAME]: BẺ BỆT TỬ THẦN (NHỊP THỨ ${betLength + 1} - ĐIỂM GÃY VÀNG)` };
+        // Nhịp cực dài -> Bẻ mạnh
+        return { prediction: h[0] === 1 ? "XIU" : "TAI", logic: `[ENDGAME]: BẺ BỆT TỬ THẦN (NHỊP THỨ ${betLength + 1})` };
     } else if (betLength >= 7) {
-        return { prediction: null, logic: `[ENDGAME]: VÙNG NGUY HIỂM (BỆT NHỊP ${betLength}) - NÍN THỞ CHỜ ĐIỂM GÃY` };
-    } else if (betLength >= 4) {
-        return { prediction: h[0] === 1 ? "TAI" : "XIU", logic: `[ENDGAME]: ĐÚ BỆT CƠ HỘI (NHỊP THỨ ${betLength + 1})` };
+        // Vùng nhà cái hay quét -> Nín thở
+        return { prediction: null, logic: `[ENDGAME]: VÙNG QUÉT VỐN (NHỊP ${betLength}) - CHỜ ĐỢI SỰ THAY ĐỔI` };
+    } else if (betLength >= 5) {
+        // PHÁT HIỆN BẪY BỆT SỚM: Dulieu.txt cho thấy nhịp 5-6 rất hay gãy -> Đánh ngược (Bẻ)
+        return { prediction: h[0] === 1 ? "XIU" : "TAI", logic: `[ENDGAME]: SÁT THỦ BẺ SỚM (NHỊP THỨ ${betLength + 1} - CHỐNG BẪY NHÀ CÁI)` };
+    } else if (betLength >= 2 && betLength <= 3) {
+        // Chỉ đú bệt khi còn sớm
+        return { prediction: h[0] === 1 ? "TAI" : "XIU", logic: `[ENDGAME]: ĐÚ BỆT SỚM (NHỊP THỨ ${betLength + 1})` };
     }
 
     // 3. THÁI CỰC TỔNG ĐIỂM NGƯỢC
@@ -1198,5 +1204,10 @@ module.exports = {
     predictLogic21, predictLogic22, predictLogic23, predictLogic24,
     logic25, logic26,
     markovWeightedV3, repeatingPatternV3, detectBiasV3,
-    calculateStdDev, getDiceFrequencies
+    calculateStdDev, getDiceFrequencies,
+    // Persistence for V10.9
+    getLogicPerformance: () => logicPerformance,
+    setLogicPerformance: (p) => { Object.assign(logicPerformance, p); },
+    getShadowTracker: () => SHADOW_TRACKER,
+    setShadowTracker: (s) => { Object.assign(SHADOW_TRACKER, s); }
 };

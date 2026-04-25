@@ -60,7 +60,10 @@ for (const gid of Object.keys(GAMES)) {
 const DATA_FILE = path.join(__dirname, 'data.json');
 function saveState() {
     try {
-        const dump = {};
+        const dump = {
+            logicPerformance: AI.getLogicPerformance ? AI.getLogicPerformance() : {},
+            shadowTracker: AI.getShadowTracker ? AI.getShadowTracker() : {}
+        };
         for (const gid of Object.keys(STATE)) {
             const S = STATE[gid];
             dump[gid] = {
@@ -69,19 +72,22 @@ function saveState() {
             };
         }
         fs.writeFileSync(DATA_FILE, JSON.stringify(dump));
-    } catch (e) { }
+    } catch (e) { console.log('[STATE] Save failed:', e.message); }
 }
 function loadState() {
     try {
         if (!fs.existsSync(DATA_FILE)) return;
         const dump = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+        if (dump.logicPerformance && AI.setLogicPerformance) AI.setLogicPerformance(dump.logicPerformance);
+        if (dump.shadowTracker && AI.setShadowTracker) AI.setShadowTracker(dump.shadowTracker);
+
         for (const gid of Object.keys(dump)) {
             if (STATE[gid]) {
                 STATE[gid].lastPhien = dump[gid].lastPhien || 0;
                 STATE[gid].predLog = dump[gid].predLog || [];
             }
         }
-        console.log('[STATE] Loaded persisted data');
+        console.log('[STATE] Loaded persisted data & AI Intelligence');
     } catch (e) { console.log('[STATE] Load failed:', e.message); }
 }
 loadState();
